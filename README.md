@@ -1,5 +1,10 @@
 # Konami Bemani DJ Main for MiSTer FPGA
 
+<img width="320" height="240" alt="image" src="https://github.com/user-attachments/assets/8093bf4b-3908-40a9-8f49-b074d433a569" /> <img width="320" height="240" alt="image" src="https://github.com/user-attachments/assets/a4c8531e-faf0-4e32-ba1a-d14f912ebc67" />
+
+
+
+
 Konami's **DJ Main** (GQ753, 1997–2002) is the board behind the original *beatmania* series and the
 first *Pop'n Music* games: a 68EC020 at 16 MHz, K056832 tilemaps, a custom sprite chip, a K055555
 mixer, two K054539 sound chips sharing 16 MB of sample RAM, and an IDE hard disk holding each
@@ -15,9 +20,8 @@ TG68K integration and SDRAM stack come from ppriest's
 [Arcade-KonamiGX_MiSTer](https://github.com/ppriest/Arcade-KonamiGX_MiSTer); see
 [docs/THIRD-PARTY-KonamiGX.md](docs/THIRD-PARTY-KonamiGX.md).
 
-> **Beta.** beatmania (1st MIX), 6th MIX and THE FINAL have been played on a MiSTer. Every other
-> game boots, draws and plays in simulation against MAME and is waiting for its first hardware
-> run. Reports welcome: see [Reporting problems](#reporting-problems).
+> **Beta.** Multiple games have been tested as working, but it is difficult to test all of them due to the HDD file sizes. Every
+> game boots, draws and plays in simulation. Reports welcome: see [Reporting problems](#reporting-problems).
 
 ## What you need
 
