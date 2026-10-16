@@ -1,0 +1,35 @@
+# TG68K.C, the 68EC020. Vendored by way of Arcade-KonamiGX_MiSTer -- see
+# rtl/cpu/tg68k/PROVENANCE.md. The package first.
+set_global_assignment -name VHDL_FILE rtl/cpu/tg68k/TG68K_Pack.vhd
+set_global_assignment -name VHDL_FILE rtl/cpu/tg68k/TG68K_ALU.vhd
+set_global_assignment -name VHDL_FILE rtl/cpu/tg68k/TG68KdotC_Kernel.vhd
+
+# From Arcade-KonamiGX_MiSTer (GPL-3.0), unchanged: the RAM templates, the
+# ROM cache, the SDRAM controller, arbiter, download and client port
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/gx_sdpram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/gx_tdpram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/gx_romcache.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/sdram/sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/sdram_arbiter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/sdram_download.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/gx_rom_port.sv
+# From Arcade-KonamiGX_MiSTer, changed for this board ([DJ] marks)
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/gx_k054539.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/dj_tilemap.sv
+
+# This board
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/dj_wr_port.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/dj_sdram_top.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/dj_div.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/dj_tdpram2.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/dj_sprites.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/dj_video.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/dj_sound.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/dj_ata.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/dj_main.sv
+
+set_global_assignment -name QIP_FILE rtl/pll/pll_0002.qip
+set_global_assignment -name VERILOG_FILE rtl/pll/pll_0002.v
+set_global_assignment -name VERILOG_FILE rtl/pll.v
+set_global_assignment -name SDC_FILE DJMain.sdc
+set_global_assignment -name SYSTEMVERILOG_FILE DJMain.sv
