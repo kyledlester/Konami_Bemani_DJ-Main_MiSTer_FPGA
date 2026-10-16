@@ -66,7 +66,7 @@ MiSTer mounts raw disk images, not CHDs. Convert each once with MAME's `chdman`:
 the script here (PowerShell; a folder per set, images already converted are skipped):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\convert_chds.ps1 -MameDir C:\path\to\mame -OutDir D:\DJMain
+powershell -ExecutionPolicy Bypass -File scripts\convert_chds.ps1 -MameDir C:\path\to\mame -OutDir C:\bemaniHDD
 ```
 
 add `-Sets bm6thmix,bmfinal` for only some games, or one at a time:
