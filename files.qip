@@ -25,6 +25,15 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/dj_tdpram2.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/dj_sprites.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/dj_video.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/dj_sound.sv
+
+# crt480i (github.com/niknakniknak/crt480i, GPL-2.0-or-later), unchanged: the
+# CRT 480i build's analog output (used only with CRT_480I, the DJMainSD revision)
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/crt_480i.sv
+
+# MiSTer-CRT-Adjust (Umberto Parisi / rmonic79, GPL-3.0-or-later), unchanged, and
+# its glue for this raster: CRT Adjust on DJMain's analog output
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/vendor/crt_adjust.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video/dj_crt_adjust.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/dj_ata.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/dj_main.sv
 

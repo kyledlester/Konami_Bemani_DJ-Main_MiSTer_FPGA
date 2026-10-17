@@ -12,6 +12,11 @@
 // The game needs its hard disk: the CHD converted once to a raw image
 // (chdman extracthd) and mounted from the OSD. The board is held in reset
 // until an image is mounted, and reset again when another one is.
+//
+// Two builds from this source: DJMain (the board's 24 kHz picture on both
+// analog and HDMI) and DJMainSD, the DJMainSD revision with CRT_480I defined
+// (rtl/video/crt_480i.sv: the analog output is 15 kHz 480i only, for a
+// standard-definition CRT; HDMI keeps the native picture through NATIVE_*).
 
 module emu
 (
@@ -24,7 +29,6 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 
-assign VGA_F1 = 0;
 assign VGA_SCALER  = 0;
 assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
@@ -48,7 +52,11 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 
 `include "build_id.v"
 localparam CONF_STR = {
+`ifdef CRT_480I
+	"DJMainSD;;",
+`else
 	"DJMain;;",
+`endif
 	"-;",
 	"S0,HDDIMG,Mount HDD;",
 	"-;",
@@ -64,6 +72,23 @@ localparam CONF_STR = {
 	"P1O[14],Mouse turntable,P1,P2;",
 	"P1-;",
 	"P1O[15],CPU speed,16 MHz (board),24 MHz;",
+`ifdef CRT_480I
+	"P2,CRT 480i;",
+	"P2-;",
+	"P2O[18:16],Deflicker,Off,Mild,Medium,Medium+,Full;",
+	"P2O[21:19],Height,1:1,200,208,216,224,232,240;",
+	"P2O[27:22],H-Position,0,+1,+2,+3,+4,+5,+6,+7,+8,+9,+10,+11,+12,+13,+14,+15,+16,+17,+18,+19,+20,+21,+22,+23,+24,+25,+26,+27,+28,+29,+30,+31,-32,-31,-30,-29,-28,-27,-26,-25,-24,-23,-22,-21,-20,-19,-18,-17,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1;",
+	"P2O[32:28],V-Position,0,+1,+2,+3,+4,+5,+6,+7,+8,+9,+10,+11,+12,+13,+14,+15,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1;",
+`else
+	// CRT Adjust (rtl/video/dj_crt_adjust.sv): the analog 24 kHz picture only;
+	// same bits and encodings as the owner's other cores
+	"P2,CRT Adjust;",
+	"P2-;",
+	"P2O[96],CRT Adjust,Off,On;",
+	"H1P2O[116:112],CRT H-Size,0,+1,+2,+3,+4,+5,+6,+7,+8,+9,+10,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1;",
+	"H1P2O[104:101],CRT H-Position,0,+6,+12,+18,+24,+30,+36,+42,-48,-42,-36,-30,-24,-18,-12,-6;",
+	"H1P2O[108:105],CRT V-Shift,0,+1,+2,+3,+4,+5,+6,+7,-8,-7,-6,-5,-4,-3,-2,-1;",
+`endif
 	"-;",
 	"DIP;",
 	"-;",
@@ -109,7 +134,11 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(1), .BLKSZ(2)) hps_io
 	.forced_scandoubler(forced_scandoubler),
 	.buttons(buttons),
 	.status(status),
+`ifdef CRT_480I
 	.status_menumask(16'd0),
+`else
+	.status_menumask({ 14'd0, ~status[96], 1'b0 }),   // H1 = the CRT Adjust amounts, hidden while Off
+`endif
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
 	.joystick_l_analog_0(joystick_l_analog_0),
@@ -372,7 +401,7 @@ dj_main u_main (
 );
 assign LED_USER = ioctl_download | ~pcb_leds[0];
 
-wire        ce_pix, hblank, vblank, hsync, vsync;
+wire        ce_pix, hblank, vblank, hsync, vsync, vb_next;
 wire [23:0] rgb;
 wire  [2:0] vdbg;
 dj_video u_video (
@@ -385,7 +414,7 @@ dj_video u_video (
 	.tile_addr, .tile_cs, .tile_ok, .tile_data,
 	.tile2_addr, .tile2_cs, .tile2_ok, .tile2_data,
 	.obj_addr, .obj_cs, .obj_ok, .obj_data,
-	.ce_pix, .rgb, .hblank, .vblank, .hsync, .vsync, .vblank_irq, .dbg(vdbg)
+	.ce_pix, .rgb, .hblank, .vblank, .hsync, .vsync, .vb_next, .vblank_irq, .dbg(vdbg)
 );
 assign hs_pulse = hsync;
 
@@ -410,9 +439,15 @@ dj_ata u_ata (
 );
 
 ///////////////////////   VIDEO OUT   ////////////////////////////
-// 24 kHz: never through the scandoubler (it would make 48 kHz)
+// The native picture: 24 kHz, never through the scandoubler (it would make
+// 48 kHz). No gamma: MiSTer's gamma_corr needs 4 clocks a pixel, and the
+// board's dots are 3 (48 MHz / 16 MHz); it would mix up the colours.
 
-arcade_video #(.WIDTH(512), .DW(24), .GAMMA(1)) arcade_video
+wire [7:0] nv_r, nv_g, nv_b;
+wire       nv_ce, nv_hs, nv_vs, nv_de, nv_vid_clk;
+wire [1:0] nv_sl;
+
+arcade_video #(.WIDTH(512), .DW(24), .GAMMA(0)) arcade_video
 (
 	.clk_video(clk_vid),
 	.ce_pix(ce_pix),
@@ -421,15 +456,136 @@ arcade_video #(.WIDTH(512), .DW(24), .GAMMA(1)) arcade_video
 	.VBlank(vblank),
 	.HSync(hsync),
 	.VSync(vsync),
-	.CLK_VIDEO(CLK_VIDEO),
-	.CE_PIXEL(CE_PIXEL),
-	.VGA_R(VGA_R), .VGA_G(VGA_G), .VGA_B(VGA_B),
-	.VGA_HS(VGA_HS), .VGA_VS(VGA_VS),
-	.VGA_DE(VGA_DE),
-	.VGA_SL(VGA_SL),
+	.CLK_VIDEO(nv_vid_clk),
+	.CE_PIXEL(nv_ce),
+	.VGA_R(nv_r), .VGA_G(nv_g), .VGA_B(nv_b),
+	.VGA_HS(nv_hs), .VGA_VS(nv_vs),
+	.VGA_DE(nv_de),
+	.VGA_SL(nv_sl),
 	.fx(3'd0),
 	.forced_scandoubler(1'b0),
 	.gamma_bus(gamma_bus)
 );
+
+assign CLK_VIDEO = nv_vid_clk;
+
+`ifdef CRT_480I
+// ---- DJMainSD: analog is 15 kHz 480i only (crt_480i), HDMI the native picture
+// The module re-times the 512x384, 24.24 kHz, 57.997 Hz picture into 541
+// half-lines a frame (15.69 kHz), one field per source frame, phase-locked to
+// it. It stores the finished colour (packed 24-bit, LUT_EXT 0), so every
+// pixel is the one HDMI shows, palette changes included. Until it has locked
+// (about 5 frames after load or reset) the analog output is black with both
+// syncs idle; there is no path from the native picture to VGA_*. Output
+// pixels: 48 MHz / 4.5 (CLK_FRAC) = 10.67 MHz, the standard 480i rate.
+// The menu bits come from hps_io on clk_sys: two flops onto clk_vid.
+reg [32:16] st480_m, st480;
+always @(posedge clk_vid) begin st480_m <= status[32:16]; st480 <= st480_m; end
+
+wire       ce480, f480;
+wire [7:0] r480, g480, b480;
+wire       hs480, vs480, de480;
+
+crt_480i #(.CLK_HZ(48_000_000), .CLK_DIV(4), .CLK_FRAC(1), .PW(24), .LUT_EXT(0)) crt_480i
+(
+	.clk      (clk_vid),
+	.ce_in    (ce_pix),
+	.pix_in   (rgb),
+	.vs_in    (vsync), .de_in(~hblank & ~vblank),
+	.hoffset  ($signed({ st480[27], st480[27:22] })),
+	.voffset  ($signed({ {2{st480[32]}}, st480[32:28] })),
+	.deflicker(st480[18:16]),
+	.vheight  (st480[21:19]),
+	.lut_addr (), .lut_rgb(24'd0),
+	.ce_out   (ce480),
+	.r_out    (r480), .g_out(g480), .b_out(b480),
+	.hs_out   (hs480), .vs_out(vs480), .de_out(de480),
+	.hb_out   (), .vb_out(),
+	.field    (f480),
+	.locked   ()
+);
+
+assign CE_PIXEL = ce480;
+assign VGA_R    = r480;
+assign VGA_G    = g480;
+assign VGA_B    = b480;
+assign VGA_HS   = hs480;
+assign VGA_VS   = vs480;
+assign VGA_DE   = de480;
+assign VGA_F1   = f480;
+assign VGA_SL   = 2'd0;
+
+assign NATIVE_CE = nv_ce;
+assign NATIVE_R  = nv_r;
+assign NATIVE_G  = nv_g;
+assign NATIVE_B  = nv_b;
+assign NATIVE_HS = nv_hs;
+assign NATIVE_VS = nv_vs;
+assign NATIVE_DE = nv_de;
+`else
+// ---- DJMain: analog the native 24 kHz picture through CRT Adjust, HDMI the
+// native picture untouched (NATIVE_*). With CRT Adjust Off (the default) the
+// adjust is a true bypass and both outputs are the same stream.
+// The menu bits come from hps_io on clk_sys: two flops onto clk_vid.
+reg [116:96] sta_m, sta;
+always @(posedge clk_vid) begin sta_m <= status[116:96]; sta <= sta_m; end
+reg vsync_d = 1'b0;
+always @(posedge clk_vid) vsync_d <= vsync;
+
+wire        ca_ce, ca_hb, ca_vb, ca_hs, ca_vs;
+wire [23:0] ca_rgb;
+dj_crt_adjust crt_adjust
+(
+	.clk(clk_vid), .ce_pix(ce_pix),
+	.frame_event(vsync && !vsync_d),          // once per frame, inside vertical blanking
+	.osd_on(sta[96]), .osd_hsize(sta[116:112]), .osd_hpos(sta[104:101]), .osd_vshift(sta[108:105]),
+	.vb_next(vb_next),
+	.rgb_in(rgb), .hblank_in(hblank), .vblank_in(vblank), .hsync_in(hsync), .vsync_in(vsync),
+	.ce_out(ca_ce), .rgb_out(ca_rgb), .hblank_out(ca_hb), .vblank_out(ca_vb),
+	.hsync_out(ca_hs), .vsync_out(ca_vs),
+	.active(), .hsize_s(), .hpos_s(), .vsh_s()
+);
+
+wire [7:0] av_r, av_g, av_b;
+wire       av_ce, av_hs, av_vs, av_de;
+wire [1:0] av_sl;
+arcade_video #(.WIDTH(512), .DW(24), .GAMMA(0)) arcade_video_vga
+(
+	.clk_video(clk_vid),
+	.ce_pix(ca_ce),
+	.RGB_in(ca_rgb),
+	.HBlank(ca_hb),
+	.VBlank(ca_vb),
+	.HSync(ca_hs),
+	.VSync(ca_vs),
+	.CLK_VIDEO(),
+	.CE_PIXEL(av_ce),
+	.VGA_R(av_r), .VGA_G(av_g), .VGA_B(av_b),
+	.VGA_HS(av_hs), .VGA_VS(av_vs),
+	.VGA_DE(av_de),
+	.VGA_SL(av_sl),
+	.fx(3'd0),
+	.forced_scandoubler(1'b0),
+	.gamma_bus()
+);
+
+assign CE_PIXEL = av_ce;
+assign VGA_R    = av_r;
+assign VGA_G    = av_g;
+assign VGA_B    = av_b;
+assign VGA_HS   = av_hs;
+assign VGA_VS   = av_vs;
+assign VGA_DE   = av_de;
+assign VGA_F1   = 1'b0;
+assign VGA_SL   = av_sl;
+
+assign NATIVE_CE = nv_ce;
+assign NATIVE_R  = nv_r;
+assign NATIVE_G  = nv_g;
+assign NATIVE_B  = nv_b;
+assign NATIVE_HS = nv_hs;
+assign NATIVE_VS = nv_vs;
+assign NATIVE_DE = nv_de;
+`endif
 
 endmodule

@@ -79,6 +79,7 @@ module dj_video (
     output reg        vblank,
     output reg        hsync,
     output reg        vsync,
+    output reg        vb_next,          // the vertical blank of the next line (CRT Adjust)
     output reg        vblank_irq,       // a clock at the start of vblank
     output     [ 2:0] dbg               // { sprite overrun, tile unsupported, tile busy at flip }
 );
@@ -228,7 +229,7 @@ always @(posedge clk) begin
 end
 
 // syncs and blanks, two dots late
-reg [1:0] hb_d, vb_d, hs_d, vs_d;
+reg [1:0] hb_d, vb_d, hs_d, vs_d, vn_d;
 always @(posedge clk) begin
     ce_pix <= ce;
     if (ce) begin
@@ -236,10 +237,12 @@ always @(posedge clk) begin
         vb_d <= { vb_d[0], vcnt >= VVIS };
         hs_d <= { hs_d[0], hcnt >= HS0 && hcnt < HS1 };
         vs_d <= { vs_d[0], vcnt >= VS0 && vcnt < VS1 };
+        vn_d <= { vn_d[0], vnext >= VVIS };
         hblank <= hb_d[1];
         vblank <= vb_d[1];
         hsync  <= hs_d[1];
         vsync  <= vs_d[1];
+        vb_next <= vn_d[1];
     end
 end
 

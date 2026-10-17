@@ -8,7 +8,7 @@
 Konami's **DJ Main** (GQ753, 1997–2002) is the board behind the original *beatmania* series and the
 first *Pop'n Music* games: a 68EC020 at 16 MHz, K056832 tilemaps, a custom sprite chip, a K055555
 mixer, two K054539 sound chips sharing 16 MB of sample RAM, and an IDE hard disk holding each
-game's music. This core runs **every DJ Main game that has been dumped** (18 sets, all titles except for the original Pop'n Music Stage) from one RBF, using
+game's music. This core runs **every DJ Main game that has been dumped** (18 sets, all titles except for the original Pop'n Music Stage) from one core, using
 the games' own MAME romsets and their **hard disks converted from the MAME CHDs**.
 
 I created this core because I wanted to play these games on my MiSTer FPGA. I am posting it here and open
@@ -27,12 +27,43 @@ TG68K integration and SDRAM stack come from ppriest's
 
 | File | Source | Put it in |
 |---|---|---|
-| `DJMain_YYYYMMDD.rbf` | this repo (`Releases/`) | `/media/fat/_Arcade/cores/` |
-| the game's MRA | this repo (`MRA/`) | `/media/fat/_Arcade/` |
+| `DJMain_YYYYMMDD.rbf` (24 kHz monitor or HDMI) **or** `DJMainSD_YYYYMMDD.rbf` (15 kHz CRT), see [Which build](#which-build-24-khz-or-crt-480i) | this repo (`Releases/`) | `/media/fat/_Arcade/cores/` |
+| the game's MRA: from `MRA/` for DJMain, from `MRA/_CRT 480i/` for DJMainSD | this repo | `/media/fat/_Arcade/` (the `_CRT 480i` folder as a folder) |
 | `<set>.zip` (for clones, the parent's zip too: `bmcmxaac` also needs `bmcompmx.zip`) | your MAME 0.289 set | `/media/fat/games/mame/` |
 | `<disk>.hdd`, converted from the set's CHD (below) | your MAME set | `/media/fat/games/<set>/` |
 
 Also needed: a 32 MB (or larger) SDRAM module, and an **exFAT** SD card for the images over 4 GB.
+
+## Which build: 24 kHz or CRT 480i
+
+The board's picture is 512 × 384 at 24 kHz (medium resolution), which a standard 15 kHz CRT can't
+show. So the core comes as two builds, each with its own MRA for every game:
+
+| Build | MRAs | Analog (VGA / JAMMA) | HDMI | For |
+|---|---|---|---|---|
+| **DJMain** | `MRA/<game>.mra` | the board's native 24 kHz, 57.997 Hz | the native picture | a 24 kHz / multisync monitor, or HDMI only |
+| **DJMainSD** | `MRA/_CRT 480i/<game> [480i].mra` | **15 kHz 480i only** (541 lines, 15.69 kHz, interlaced) | the native picture, the same as DJMain | a standard-definition CRT: TV, PVM, 15 kHz arcade monitor |
+
+The choice is the MRA you launch: a `[480i]` MRA loads DJMainSD, the others load DJMain. A build
+can't come up in the wrong mode, because the mode is fixed in the build, not set by a menu or
+`MiSTer.ini` option:
+
+* **DJMainSD has no path from the 24 kHz picture to the analog output.** Until it has locked onto
+  the game's picture (about 5 frames after the core loads or resets) the analog output is black
+  with no sync at all; then it is 480i. It also ties MiSTer's scaler off the analog port, so no
+  `MiSTer.ini` setting (`vga_scaler`, `forced_scandoubler`) can put another mode there.
+* **DJMain** outputs the board's 24 kHz on analog, exactly as before.
+
+**On a 15 kHz CRT, install only DJMainSD and the `_CRT 480i` MRAs.** Some 15 kHz monitors are
+damaged by a 24 kHz signal, and with only the `[480i]` MRAs on the card there is nothing that can
+send one. (Your MiSTer menu must already be set up for 15 kHz in `MiSTer.ini`, as for any
+15 kHz setup.) With `direct_video=1`, HDMI carries the same 480i stream as the analog port.
+
+How the 480i picture is made, by [crt480i](https://github.com/niknakniknak/crt480i): each field is
+a new frame of the game, field 0 the even lines and field 1 the odd lines, so motion stays at the
+board's 57.997 Hz and, at Height 1:1 with Deflicker off, every one of the 384 lines reaches the
+screen unchanged. The output is phase-locked to the game: no dropped or repeated frames, and
+under one frame of delay. The colours are the finished pixels, the same as HDMI shows.
 
 ### Supported games
 
@@ -127,6 +158,15 @@ Coin, Test, Service. Default pad: Y, X, B, A, L, R for panels 1–6, Start for O
 * **Controls** — turntable stick (left / right / off), speed, direction, which player the mouse
   drives; **CPU speed**: 16 MHz (board, default) or 24 MHz.
 * **DIP switches** — each game's, from MAME (coinage, difficulty, stages, demo sounds, event mode…).
+* **CRT Adjust** (DJMain only) — the same tool as other MiSTer arcade cores: On/Off (Off by
+  default), CRT H-Size (−12 % to +10 %), H-Position (±6-dot steps) and V-Shift, for lining up the
+  24 kHz picture on an analog monitor. It moves the picture inside the line, never the sync, so the
+  monitor can't lose lock, and every setting keeps all 512 × 384 pixels on screen. It changes the
+  analog output only: HDMI keeps the untouched picture. Off is an exact passthrough; On adds one
+  line (41 µs) of delay.
+* **CRT 480i** (DJMainSD only) — Deflicker (Off, Mild, Medium, Medium+, Full: blends neighbouring
+  lines to calm interlace flicker on fine detail), Height (1:1, or stretched to 200–240 lines a
+  field), H-Position, V-Position.
 * **Reset**.
 
 ## Timing and latency
@@ -146,13 +186,18 @@ These games judge to the frame, so the core keeps the board's timing exact:
 
 For the lowest display latency, keep the native 58 Hz: on HDMI set `vsync_adjust=2` in
 `MiSTer.ini` (it can go in a `[DJMain]` section) so the output locks to the core's 57.997 Hz
-instead of being converted to 60 Hz. On analog video the 24 kHz output goes out directly.
+instead of being converted to 60 Hz. On analog video the 24 kHz output goes out directly; the
+480i output (DJMainSD) is locked to the game's frames and adds under one frame.
 
 ## Known issues
 
 * **Most games are not yet tested on hardware** (see the table). The simulation results are below.
-* **24 kHz analog video only**, as the board. A 15 kHz-only CRT can't show it; use a 24 kHz /
-  multisync monitor, or HDMI. 24 kHz is current untested.
+* **Analog video is untested on hardware** in both builds: the 24 kHz output (DJMain) and the
+  480i output (DJMainSD), both checked in simulation on this core's exact timing.
+* **CRT Adjust is untested on hardware** (no 24 kHz monitor yet); it passes 1,172 simulation
+  checks on this board's raster. Reports from 24 kHz monitor owners are especially welcome.
+* **Gamma is unavailable.** MiSTer's gamma correction needs at least 4 video clocks a pixel and
+  this board's pixels are 3, so it would garble the colours; the core switches it off.
 * **Cabinet lamps are not output**.
 * **Not yet supported:** Other clone sets (2nd MIX JA-A, 3rd MIX JA-A and EA-A, complete
   MIX JA-B, hiphopmania complete MIX 1 / 2, beatstage complete MIX / 4th MIX, Pop'n Music AA-A /
@@ -166,8 +211,16 @@ video. For a game that stops during boot, the last screen it shows is the most u
 
 ## Building
 
-Quartus Prime Lite 17.0: `quartus_sh --flow compile DJMain -c DJMain` (output
-`output_files/DJMain.rbf`, renamed `DJMain_YYYYMMDD.rbf`).
+Quartus Prime Lite 17.0, one project with two revisions:
+
+```bash
+quartus_sh --flow compile DJMain -c DJMain
+quartus_sh --flow compile DJMain -c DJMainSD
+```
+
+They give `output_files/DJMain.rbf` and `output_files/DJMainSD.rbf`, renamed
+`DJMain_YYYYMMDD.rbf` and `DJMainSD_YYYYMMDD.rbf`. `DJMainSD.qsf` is `DJMain.qsf` plus the
+`CRT_480I` macro.
 
 ## Verification
 
@@ -189,8 +242,15 @@ No ROM, disk or other game content is included in this repository or the RBF.
 * **ppriest's [Arcade-KonamiGX_MiSTer](https://github.com/ppriest/Arcade-KonamiGX_MiSTer)** — the
   K056832 tilemap renderer, the K054539, the TG68K integration and the SDRAM stack.
 * TG68K.C (Tobias Gubener), Sorgelig's SDRAM controller and the MiSTer framework.
+* **rmonic79's (Umberto Parisi) [MiSTer-CRT-Adjust](https://github.com/rmonic79/MiSTer-CRT-Adjust)** —
+  CRT Adjust (`rtl/vendor/crt_adjust.sv`; the one change is its line buffer's width, made a
+  parameter to hold this board's 660-dot line).
+* **Chris Watson's [crt480i](https://github.com/niknakniknak/crt480i)** — the 480i module
+  (`rtl/video/crt_480i.sv`, unchanged) and the framework change for it; its approach was inspired
+  by rmonic79's `crt_vsize.sv` ([MiSTer-CRT-Adjust](https://github.com/rmonic79/MiSTer-CRT-Adjust)).
 * MAME's `djmain.cpp` (smf) and Guru's hardware notes.
 
 ## License
 
-GPL-3.0-or-later, as the code it builds on (`LICENSE`).
+GPL-3.0-or-later, as the code it builds on (`LICENSE`). `rtl/video/crt_480i.sv` is
+GPL-2.0-or-later (its header), used here under GPL-3.0.

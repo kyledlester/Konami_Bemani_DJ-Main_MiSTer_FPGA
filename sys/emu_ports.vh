@@ -31,6 +31,16 @@ output [1:0]  VGA_SL,
 output        VGA_SCALER, // Force VGA scaler
 output        VGA_DISABLE, // analog out is off
 
+// Local addition (crt480i's sys change): the core's native picture, for the HDMI scaler.
+// VGA_* above carries the analog picture (CRT Adjust / 480i); see sys_top.v.
+output        NATIVE_CE,
+output  [7:0] NATIVE_R,
+output  [7:0] NATIVE_G,
+output  [7:0] NATIVE_B,
+output        NATIVE_HS,
+output        NATIVE_VS,
+output        NATIVE_DE,
+
 input  [11:0] HDMI_WIDTH,
 input  [11:0] HDMI_HEIGHT,
 output        HDMI_FREEZE,

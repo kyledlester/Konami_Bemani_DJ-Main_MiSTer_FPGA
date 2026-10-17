@@ -287,12 +287,19 @@ cyclonev_hps_interface_mpu_general_purpose h2f_gp
 
 reg [15:0] cfg;
 reg        cfg_set      = 0;
+wire       hdmi_f1;     // the HDMI scaler's field flag (CRT 480i: progressive)
 
 `ifdef MISTER_DEBUG_NOHDMI
 	wire    vga_fb       = 0;
 	wire    direct_video = 1;
 `else
+`ifdef CRT_480I
+	// CRT 480i build: the VGA port never carries the scaler (15 kHz-only monitor). vga_fb and
+	// vga_scaler are tied off, so no MiSTer.ini setting can route a scaled mode to VGA.
+	wire    vga_fb       = 0;
+`else
 	wire    vga_fb       = cfg[12] | vga_force_scaler;
+`endif
 	wire    direct_video = cfg[10];
 `endif
 
@@ -306,7 +313,11 @@ wire       io_osd_vga   = io_ss1 & ~io_ss2;
 	`ifdef MISTER_DEBUG_NOHDMI
 		wire vga_scaler   = 0;
 	`else
+		`ifdef CRT_480I
+		wire vga_scaler   = 0;  // CRT 480i build, see vga_fb above
+		`else
 		wire vga_scaler   = cfg[2] | vga_force_scaler;
+		`endif
 	`endif
 `endif
 
@@ -753,7 +764,7 @@ wire         bob_deint;
 		.i_b      (hb_out),
 		.i_hs     (hhs_fix),
 		.i_vs     (hvs_fix),
-		.i_fl     (f1),
+		.i_fl     (hdmi_f1),
 		.i_de     (hde_emu),
 		.iauto    (1),
 		.himin    (0),
@@ -1709,14 +1720,25 @@ sync_fix sync_h(clk_vid, hs_emu, hs_fix);
 
 wire  [6:0] user_out, user_in;
 
+// Local addition (crt480i's sys change): the HDMI scaler takes the core's native picture
+// (NATIVE_*), while VGA carries the core's analog picture -- in DJMain the native picture
+// through CRT Adjust, in the CRT_480I build (DJMainSD) the 15 kHz 480i one. With
+// direct_video, HDMI carries the VGA stream, so the scaler input (which the HPS also
+// measures) follows it.
+wire  [7:0] nat_r, nat_g, nat_b;
+wire        nat_ce, nat_hs, nat_vs, nat_de, nat_hs_fix, nat_vs_fix;
+sync_fix sync_nv(clk_vid, nat_vs, nat_vs_fix);
+sync_fix sync_nh(clk_vid, nat_hs, nat_hs_fix);
+assign hdmi_f1  = direct_video & f1;   // the native picture is progressive
+
 assign clk_ihdmi= clk_vid;
-assign ce_hpix  = vga_ce_sl;
-assign hr_out   = vga_data_sl[23:16];
-assign hg_out   = vga_data_sl[15:8];
-assign hb_out   = vga_data_sl[7:0];
-assign hhs_fix  = vga_hs_sl;
-assign hvs_fix  = vga_vs_sl;
-assign hde_emu  = vga_de_sl;
+assign ce_hpix  = direct_video ? vga_ce_sl          : nat_ce;
+assign hr_out   = direct_video ? vga_data_sl[23:16] : nat_r;
+assign hg_out   = direct_video ? vga_data_sl[15:8]  : nat_g;
+assign hb_out   = direct_video ? vga_data_sl[7:0]   : nat_b;
+assign hhs_fix  = direct_video ? vga_hs_sl          : nat_hs_fix;
+assign hvs_fix  = direct_video ? vga_vs_sl          : nat_vs_fix;
+assign hde_emu  = direct_video ? vga_de_sl          : nat_de;
 
 wire uart_dtr;
 wire uart_dsr;
@@ -1757,7 +1779,7 @@ emu emu
 (
 	.CLK_50M(FPGA_CLK2_50),
 	.RESET(reset),
-	.HPS_BUS({f1, HDMI_TX_VS, 
+	.HPS_BUS({hdmi_f1, HDMI_TX_VS, 
 				 clk_100m, clk_ihdmi,
 				 ce_hpix, hde_emu, hhs_fix, hvs_fix, 
 				 io_wait, clk_sys, io_fpga, io_uio, io_strobe, io_wide, io_din, io_dout}),
@@ -1770,6 +1792,13 @@ emu emu
 	.VGA_DE(de_emu),
 	.VGA_F1(f1),
 	.VGA_SCALER(vga_force_scaler),
+	.NATIVE_CE(nat_ce),
+	.NATIVE_R(nat_r),
+	.NATIVE_G(nat_g),
+	.NATIVE_B(nat_b),
+	.NATIVE_HS(nat_hs),
+	.NATIVE_VS(nat_vs),
+	.NATIVE_DE(nat_de),
 
 `ifndef MISTER_DUAL_SDRAM
 	.VGA_DISABLE(VGA_DISABLE),
