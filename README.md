@@ -42,7 +42,7 @@ show. So the core comes as two builds, each with its own MRA for every game:
 | Build | MRAs | Analog (VGA / JAMMA) | HDMI | For |
 |---|---|---|---|---|
 | **DJMain** | `MRA/<game>.mra` | the board's native 24 kHz, 57.997 Hz | the native picture | a 24 kHz / multisync monitor, or HDMI only |
-| **DJMainSD** | `MRA/_CRT 480i/<game> [480i].mra` | **15 kHz 480i only** (541 lines, 15.69 kHz, interlaced) | the native picture, the same as DJMain | a standard-definition CRT: TV, PVM, 15 kHz arcade monitor |
+| **DJMainSD** | `MRA/_CRT 480i/<game> [480i].mra` | **15 kHz 480i only** (541 lines, 15.69 kHz, interlaced); tested working on a 15 kHz CRT | the native picture, the same as DJMain | a standard-definition CRT: TV, PVM, 15 kHz arcade monitor |
 
 The choice is the MRA you launch: a `[480i]` MRA loads DJMainSD, the others load DJMain. A build
 can't come up in the wrong mode, because the mode is fixed in the build, not set by a menu or
@@ -192,8 +192,8 @@ instead of being converted to 60 Hz. On analog video the 24 kHz output goes out 
 ## Known issues
 
 * **Most games are not yet tested on hardware** (see the table). The simulation results are below.
-* **Analog video is untested on hardware** in both builds: the 24 kHz output (DJMain) and the
-  480i output (DJMainSD), both checked in simulation on this core's exact timing.
+* **The 24 kHz analog output (DJMain) is untested on hardware**; it is checked in simulation on
+  this core's exact timing. (The 480i output, DJMainSD, is tested working on a 15 kHz CRT.)
 * **CRT Adjust is untested on hardware** (no 24 kHz monitor yet); it passes 1,172 simulation
   checks on this board's raster. Reports from 24 kHz monitor owners are especially welcome.
 * **Gamma is unavailable.** MiSTer's gamma correction needs at least 4 video clocks a pixel and
